@@ -1,9 +1,16 @@
 import os
 import sys
+import time
+from datetime import datetime
 from dotenv import load_dotenv
 from openai import OpenAI
 
 load_dotenv()
+
+
+def ts():
+    return datetime.now().strftime("%H:%M:%S.%f")[:-3]
+
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
@@ -12,10 +19,14 @@ client = OpenAI(
 
 
 def chat(messages: list, tools: list = None) -> dict:
-    kwargs = dict(model="qwen/qwen3-32b", messages=messages, temperature=0.7)
+    model = "qwen/qwen3-32b"
+    kwargs = dict(model=model, messages=messages, temperature=0.7)
     if tools:
         kwargs["tools"] = tools
+    print(f"{ts()} [chat] start  model={model} msgs={len(messages)}")
+    t0 = time.time()
     response = client.chat.completions.create(**kwargs)
+    print(f"{ts()} [chat] done   {time.time() - t0:.2f}s")
     return response.choices[0].message
 
 

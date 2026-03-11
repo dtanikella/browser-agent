@@ -1,5 +1,5 @@
 import atexit
-from playwright.sync_api import sync_playwright, Page
+from playwright.sync_api import sync_playwright, Page, Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
 
 _playwright = None
 _browser = None
@@ -26,17 +26,28 @@ def _get_page(url: str) -> Page:
     _ensure_browser()
     if url not in _page_cache:
         page = _browser.new_page()
-        page.goto(url)
+        try:
+            page.goto(url, timeout=30000)
+        except PlaywrightTimeoutError:
+            raise RuntimeError(f"ERROR: Timeout loading {url}")
+        except PlaywrightError as e:
+            raise RuntimeError(f"ERROR: Navigation failed for {url} — {e.message}")
         _page_cache[url] = page
     return _page_cache[url]
 
 
 def get_page_title(url: str) -> str:
-    return _get_page(url).title()
+    try:
+        return _get_page(url).title()
+    except Exception as e:
+        return str(e)
 
 
-def get_page_text(url: str) -> str:
-    return _get_page(url).inner_text("body")
+def get_body(url: str) -> str:
+    try:
+        return _get_page(url).inner_text("body")
+    except Exception as e:
+        return str(e)
 
 
 TOOLS = [
@@ -57,7 +68,7 @@ TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "get_page_text",
+            "name": "get_body",
             "description": "Get the visible body text of a web page.",
             "parameters": {
                 "type": "object",
@@ -72,5 +83,5 @@ TOOLS = [
 
 TOOL_MAP = {
     "get_page_title": get_page_title,
-    "get_page_text": get_page_text,
+    "get_body": get_body,
 }

@@ -11,6 +11,12 @@ def ts():
 
 SYSTEM_PROMPT = "You are a browser agent. Use the provided tools, and context you've been given to accomplish the task. be concise."
 
+FAILURE_SYSTEM_PROMPT = (
+    "One or more tools failed. "
+    "Tell the user you were unable to complete the task and briefly state why based on the error. "
+    "Do not suggest alternatives, workarounds, or next steps."
+)
+
 
 def run(query: str):
     messages = [
@@ -35,7 +41,19 @@ def run(query: str):
                 "tool_call_id": tool_call.id,
                 "content": result,
             })
-        response = chat(messages)
+        any_errors = any(
+            msg["content"].startswith("ERROR:")
+            for msg in messages
+            if isinstance(msg, dict) and msg.get("role") == "tool"
+        )
+        if any_errors:
+            messages_for_call2 = [
+                {"role": "system", "content": FAILURE_SYSTEM_PROMPT},
+                *messages[1:]
+            ]
+        else:
+            messages_for_call2 = messages
+        response = chat(messages_for_call2)
 
     print(response.content)
 

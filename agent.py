@@ -7,6 +7,38 @@ from browser_actions import TOOLS, TOOL_MAP
 
 MAX_ITERATIONS = 20
 STUCK_THRESHOLD = 3  # consecutive all-error iterations before aborting early
+WINDOW_SIZE = 5
+NEVER_MASK = {"get_current_url", "navigate"}
+
+
+def mask_tool_result(content: str, tool_name: str) -> str:
+    if tool_name == "extract_links":
+        texts = [line.split("(")[0].replace("Link:", "").strip()
+                 for line in content.splitlines() if line.startswith("Link:")]
+        summary = ", ".join(texts[:5]) or "links"
+        return f"[result masked: extracted links to {summary}]"
+    elif tool_name == "get_page_content":
+        return f"[result masked: {content[:80]}...]"
+    elif tool_name == "get_page_html":
+        return "[result masked: HTML snapshot]"
+    elif tool_name == "take_screenshot":
+        return "[result masked: screenshot]"
+    elif tool_name in ("click", "type_text", "press_key", "wait_for_selector"):
+        return "[result masked: action completed]"
+    return "[result masked]"
+
+
+def build_working_messages(raw_history: list, static_prefix: list) -> list:
+    result = list(static_prefix)
+    max_idx = len(raw_history) - 1
+    for msg in raw_history:
+        age = max_idx - msg.get("_turn_index", 0)
+        tool_name = msg.get("_tool_name")
+        clean = {k: v for k, v in msg.items() if not k.startswith("_")}
+        if msg["role"] == "tool" and tool_name not in NEVER_MASK and age > WINDOW_SIZE:
+            clean = {**clean, "content": mask_tool_result(msg["content"], tool_name)}
+        result.append(clean)
+    return result
 
 
 def ts():
@@ -22,21 +54,29 @@ SYSTEM_PROMPT = (
 
 
 def run(url: str, goal: str):
-    messages = [
+    static_prefix = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"Start at: {url}\nGoal: {goal}"},
     ]
+    raw_history = []
 
     consecutive_all_error_iterations = 0
 
     for iteration in range(MAX_ITERATIONS):
-        response = chat(messages, tools=TOOLS)
+        working = build_working_messages(raw_history, static_prefix)
+        response = chat(working, tools=TOOLS)
 
         if not response.tool_calls:
             print(response.content)
             return
 
-        messages.append(response)
+        assistant_msg = {"role": "assistant", "content": response.content, "_turn_index": len(raw_history)}
+        if response.tool_calls:
+            assistant_msg["tool_calls"] = [
+                {"id": tc.id, "type": tc.type, "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                for tc in response.tool_calls
+            ]
+        raw_history.append(assistant_msg)
 
         tool_results = []
         for tool_call in response.tool_calls:
@@ -48,11 +88,14 @@ def run(url: str, goal: str):
             result = TOOL_MAP[fn_name](**args)
             elapsed = time.time() - t0
             print(f"{ts()} [tool] {fn_name}  done {elapsed:.2f}s")
-            tool_results.append(str(result))
-            messages.append({
+            result_str = str(result)
+            tool_results.append(result_str)
+            raw_history.append({
                 "role": "tool",
                 "tool_call_id": tool_call.id,
-                "content": str(result),
+                "content": result_str,
+                "_turn_index": len(raw_history),
+                "_tool_name": fn_name,
             })
 
         if all(r.startswith("ERROR:") for r in tool_results):
@@ -65,7 +108,8 @@ def run(url: str, goal: str):
             break
 
     print(f"{ts()} [agent] requesting final synthesis (no tools)")
-    final = chat(messages)
+    working = build_working_messages(raw_history, static_prefix)
+    final = chat(working)
     print(final.content)
 
 

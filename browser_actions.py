@@ -58,6 +58,38 @@ def get_page_html() -> str:
         return f"ERROR: {e}"
 
 
+def extract_links(selector: str = "") -> str:
+    try:
+        _ensure_browser()
+        links = _page.evaluate("""
+            (selector) => {
+                const containers = selector
+                    ? Array.from(document.querySelectorAll(selector))
+                    : [document.body];
+                const seen = new Set();
+                const results = [];
+                for (const el of containers) {
+                    for (const a of el.querySelectorAll('a[href]')) {
+                        const href = a.href;
+                        const text = a.textContent.trim().replace(/\\s+/g, ' ');
+                        const key = href + '|' + text;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            results.push({ text, href });
+                        }
+                    }
+                }
+                return results;
+            }
+        """, selector)
+        if not links:
+            return "No links found."
+        lines = [f"{i+1}. [{l['text'] or '(no text)'}] -> {l['href']}" for i, l in enumerate(links)]
+        return f"Found {len(links)} link(s):\n" + "\n".join(lines)
+    except Exception as e:
+        return f"ERROR: extract_links failed: {e}"
+
+
 def click(selector: str) -> str:
     _ensure_browser()
     try:
@@ -149,6 +181,27 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "extract_links",
+            "description": (
+                "Extract all links from the page or from elements matching an optional CSS selector. "
+                "Returns a numbered list of {text, href} pairs. "
+                "Use a selector like '#nav', '.sidebar', or 'main' to scope the results."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "selector": {
+                        "type": "string",
+                        "description": "Optional CSS selector to scope link extraction (e.g. '#nav', '.menu', 'main'). Omit or leave empty for all page links."
+                    }
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "click",
             "description": "Click an element on the current page by CSS selector.",
             "parameters": {
@@ -226,6 +279,7 @@ TOOL_MAP = {
     "navigate": navigate,
     "get_page_content": get_page_content,
     "get_page_html": get_page_html,
+    "extract_links": extract_links,
     "click": click,
     "type_text": type_text,
     "press_key": press_key,

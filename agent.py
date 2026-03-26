@@ -18,7 +18,7 @@ def mask_tool_result(content: str, tool_name: str) -> str:
         summary = ", ".join(texts[:5]) or "links"
         return f"[result masked: extracted links to {summary}]"
     elif tool_name == "get_page_content":
-        return f"[result masked: {content[:80]}...]"
+        return f"[result truncated: {content[:2000]}...]"
     elif tool_name == "get_page_html":
         return "[result masked: HTML snapshot]"
     elif tool_name == "take_screenshot":
@@ -35,8 +35,13 @@ def build_working_messages(raw_history: list, static_prefix: list) -> list:
         age = max_idx - msg.get("_turn_index", 0)
         tool_name = msg.get("_tool_name")
         clean = {k: v for k, v in msg.items() if not k.startswith("_")}
-        if msg["role"] == "tool" and tool_name not in NEVER_MASK and age > WINDOW_SIZE:
-            clean = {**clean, "content": mask_tool_result(msg["content"], tool_name)}
+        if msg["role"] == "tool" and tool_name not in NEVER_MASK:
+            if tool_name == "get_page_content":
+                should_mask = age > 0
+            else:
+                should_mask = age > WINDOW_SIZE
+            if should_mask:
+                clean = {**clean, "content": mask_tool_result(msg["content"], tool_name)}
         result.append(clean)
     return result
 

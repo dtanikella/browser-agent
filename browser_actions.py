@@ -48,10 +48,15 @@ def go_back() -> str:
         return f"ERROR: {e}"
 
 
+MAX_PAGE_CONTENT = 2000
+
 def get_page_content() -> str:
     _ensure_browser()
     try:
-        return _page.inner_text("body")
+        content = _page.inner_text("body")
+        if len(content) > MAX_PAGE_CONTENT:
+            content = content[:MAX_PAGE_CONTENT] + "\n[truncated]"
+        return content
     except Exception as e:
         return f"ERROR: {e}"
 

@@ -37,6 +37,17 @@ def navigate(url: str) -> str:
         return f"ERROR: Navigation failed for {url} — {e.message}"
 
 
+def go_back() -> str:
+    _ensure_browser()
+    try:
+        response = _page.go_back(wait_until="domcontentloaded")
+        if response is None:
+            return "ERROR: No previous page in history."
+        return f"Went back to: {_page.url}"
+    except Exception as e:
+        return f"ERROR: {e}"
+
+
 def get_page_content() -> str:
     _ensure_browser()
     try:
@@ -165,6 +176,14 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "go_back",
+            "description": "Navigate back to the previous page in browser history. Use this when the current page is a dead end and you need to return to where you came from.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_page_content",
             "description": "Get the full visible text content of the current page.",
             "parameters": {"type": "object", "properties": {}},
@@ -277,6 +296,7 @@ TOOLS = [
 
 TOOL_MAP = {
     "navigate": navigate,
+    "go_back": go_back,
     "get_page_content": get_page_content,
     "get_page_html": get_page_html,
     "extract_links": extract_links,

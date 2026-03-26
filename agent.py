@@ -17,7 +17,7 @@ SYSTEM_PROMPT = (
     "You are a browser agent. You have access to browser tools to navigate and interact with websites. "
     "You will be given a URL to start at and a goal. Navigate step by step, calling tools as needed. "
     "When you have gathered enough information to answer the goal, stop calling tools and give your final answer. "
-    "Be systematic: navigate, observe the page (use extract_links to find links, get_page_content for text), interact with inputs, wait for results, read the output."
+    "Be systematic: navigate, observe the page (use extract_links to find links, get_page_content for text, and go_back if you reach a dead end), interact with inputs, wait for results, read the output."
 )
 
 

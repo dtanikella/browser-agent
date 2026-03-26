@@ -19,7 +19,7 @@ client = OpenAI(
 
 
 def chat(messages: list, tools: list = None) -> dict:
-    model = "qwen/qwen3-32b"
+    model = "deepseek/deepseek-v3.2"
     kwargs = dict(model=model, messages=messages, temperature=0.7)
     if tools:
         kwargs["tools"] = tools
